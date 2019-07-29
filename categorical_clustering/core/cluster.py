@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import entropy
-from sklearn.metrics import mutual_info_score
 
-from functools import reduce
 from categorical_clustering.utils.logger import log
 
 ALPHA = 1
@@ -18,13 +16,7 @@ class Clustering:
         self.clusters = np.zeros((n_clusters, len(values)))
 
     def calculate_impurity(self):
-        impurity = np.apply_along_axis(lambda x: entropy(x) * (sum(x) / self.data_count), 1, self.clusters).sum()
-        mi_score = 0.0
-        for i in range(self.n_clusters):
-            for j in range(i+1, self.n_clusters):
-                mi_score += mutual_info_score(self.clusters[i], self.clusters[j])
-        impurity += mi_score * ALPHA
-        return impurity
+        return np.apply_along_axis(lambda x: entropy(x) * sum(x), 1, self.clusters).sum()
 
     def calculate_conditional_impurity(self, addition_element, cluster):
         self.clusters[cluster][addition_element] += 1
