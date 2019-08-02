@@ -1,7 +1,7 @@
 import numpy as np
 
 from categorical_clustering.utils.logger import log
-from categorical_clustering.core.cluster import Clustering
+from categorical_clustering.core.data.clustering import Clustering
 
 
 def cluster(labels, n_clusters):
