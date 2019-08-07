@@ -1,14 +1,18 @@
 
-class VERBOSITY:
+class LEVEL:
     ERROR = 0,
     INFO = 1,
     VERBOSE = 2,
 
 
-verbosity = VERBOSITY.INFO
+verbosity = LEVEL.INFO
 
 
-def log(message, level=VERBOSITY.INFO):
+def log(message, tabs=0, level=LEVEL.INFO):
     if level > verbosity:
         return
-    print(message)
+    print(get_tabs(tabs) + message)
+
+
+def get_tabs(count):
+    return '  ' * count

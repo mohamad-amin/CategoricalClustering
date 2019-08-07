@@ -6,6 +6,9 @@ from .base import BaseIterativeClustering
 
 class EpsilonPmf(BaseIterativeClustering):
 
+    def _random_swap(self):
+        raise NotImplementedError()
+
     def _calculate_centroids(self) -> list:
         cluster_pmfs = [deepcopy(cmf) for cmf in self.clustering.clusters]
         for k, pmf in enumerate(cluster_pmfs):
@@ -16,6 +19,7 @@ class EpsilonPmf(BaseIterativeClustering):
     def _assign_data_to_clusters(self, centroids: list) -> int:
 
         movements = 0
+        writable_clusters = self.clustering.get_writable_clusters()
         for index, row in self.dataset.iterrows():
 
             candidate_clusters = []
@@ -41,9 +45,10 @@ class EpsilonPmf(BaseIterativeClustering):
                         selected_cluster = k
 
             if prev_cluster != selected_cluster:
-                self.clustering.clusters[prev_cluster][multi_index] -= 1
-                self.clustering.clusters[selected_cluster][multi_index] += 1
+                writable_clusters[prev_cluster][multi_index] -= 1
+                writable_clusters[selected_cluster][multi_index] += 1
                 movements += 1
                 self.cluster_assignments[index] = selected_cluster
 
+        self.clustering.update_clusters_from_writable(writable_clusters)
         return movements

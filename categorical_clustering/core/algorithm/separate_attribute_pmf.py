@@ -7,6 +7,9 @@ from .base import BaseIterativeClustering
 
 class SeparateAttributePMF(BaseIterativeClustering):
 
+    def _random_swap(self):
+        raise NotImplementedError()
+
     def _calculate_centroids(self) -> list:
         cluster_dimensions = []
         dimensions = list(range(len(self.clustering.n_categories)))
@@ -14,7 +17,7 @@ class SeparateAttributePMF(BaseIterativeClustering):
             dimension_counts = []
             for d in dimensions:
                 other_dimensions = dimensions[:d] + dimensions[d + 1:]
-                dimension_values = deepcopy(np.apply_over_axes(np.sum, self.clustering.clusters[k], other_dimensions).squeeze())
+                dimension_values = deepcopy(np.sum(self.clustering.clusters[k], other_dimensions).todense().squeeze())
                 dimension_counts += [dimension_values]
             cluster_dimensions += [dimension_counts]
         return cluster_dimensions
@@ -22,6 +25,7 @@ class SeparateAttributePMF(BaseIterativeClustering):
     def _assign_data_to_clusters(self, centroids: list) -> int:
 
         movements = 0
+        writable_clusters = self.clustering.get_writable_clusters()
         for index, row in self.dataset.iterrows():
 
             least_entropy = float('inf')
@@ -40,11 +44,12 @@ class SeparateAttributePMF(BaseIterativeClustering):
                     selected_cluster = k
 
             if prev_cluster != selected_cluster:
-                self.clustering.clusters[prev_cluster][multi_index] -= 1
-                self.clustering.clusters[selected_cluster][multi_index] += 1
+                writable_clusters[prev_cluster][multi_index] -= 1
+                writable_clusters[selected_cluster][multi_index] += 1
                 movements += 1
                 self.cluster_assignments[index] = selected_cluster
             else:
                 pass
 
+        self.clustering.update_clusters_from_writable(writable_clusters)
         return movements
