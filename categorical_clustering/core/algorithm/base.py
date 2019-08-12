@@ -1,4 +1,3 @@
-import sparse
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -19,6 +18,14 @@ class BaseIterativeClustering:
         self.clustering = None
         self.category_values = None
         self.cluster_assignments = None
+        self.step_init = 0
+        self.step_index = 0
+        self.step_calc = 0
+        self.step_calc_1 = 0
+        self.step_calc_2 = 0
+        self.step_assign = 0
+        self.overall_time = 0
+        self.should_abort = False
 
     def set_data(self, dataset: pd.DataFrame) -> None:
         """
@@ -53,12 +60,16 @@ class BaseIterativeClustering:
         """
         self.clustering.reset_clusters()
         writable_clusters = self.clustering.get_writable_clusters()
-        for idx, row in self.dataset.iterrows():
+        for idx, row in zip(self.dataset.index, self.dataset.values):
             cluster = np.random.choice(self.n_clusters)
             multi_index = self._get_multi_dimensional_index(row)
-            writable_clusters[cluster][multi_index] += 1
+            self.clustering.assign_row_to_cluster(multi_index, cluster)
             self.cluster_assignments[idx] = cluster
         self.clustering.update_clusters_from_writable(writable_clusters)
+        for k in range(self.n_clusters):
+            if self.clustering.get_cluster_size(k) == 0:
+                self._initialize_clusters()
+                return
 
     @abstractmethod
     def _calculate_centroids(self) -> list:
@@ -90,6 +101,8 @@ class BaseIterativeClustering:
         :return: An int, the number of data points who have moved between clusters.
         """
         centroids = self._calculate_centroids()
+        if self.should_abort:
+            return -1
         moved_points_count = self._assign_data_to_clusters(centroids)
         return moved_points_count
 
@@ -108,7 +121,9 @@ class BaseIterativeClustering:
         while True:
             iterations += 1
             moved_points_count = self._perform_iteration()
-            if True:
+            if self.should_abort:
+                return None, -1
+            if verbose:
                 print('Moved points in iteration {}: {}'.format(iterations, moved_points_count))
                 print('Overall impurity is now: {}'.format(self.clustering.calculate_overall_impurity()))
             if moved_points_count / self.dataset.shape[0] <= update_proportion_criterion:
@@ -127,7 +142,7 @@ class BaseIterativeClustering:
             number of iterations until convergence according to the criterion (iterations of the original algorithm,
             not random swap).
         """
-        _, iterations = self.perform_clustering(update_proportion_criterion, verbose)
+        _, iterations = self.perform_clustering(update_proportion_criterion=update_proportion_criterion, verbose=verbose)
         random_swaps = 0
 
         while random_swaps < t:
@@ -140,18 +155,25 @@ class BaseIterativeClustering:
             # Performing a random swap
             self._random_swap()
             _, iters = self.perform_clustering(update_proportion_criterion, False, verbose)
+            if self.should_abort:
+                print('Aborting random swap...')
+                self.clustering = prev_clustering
+                self.cluster_assignments = prev_cluster_assignemnts
+                self.should_abort = False
+                random_swaps += 1
+                continue
             iterations += iters
 
             # Checking if we've fucked up and if so, then rolling back
             if self.clustering.calculate_overall_impurity() > prev_overall_impurity:
-                if True:
+                if verbose:
                     print('Random swap rejected!')
                 self.clustering = prev_clustering
                 self.cluster_assignments = prev_cluster_assignemnts
             else:
-                if True:
+                if verbose:
                     print('Random swap accepted!')
-                random_swaps += 1
+            random_swaps += 1
 
         return self.clustering, iterations
 
@@ -161,19 +183,25 @@ class BaseIterativeClustering:
         :param cluster:
         :return:
         """
+
         if cluster == -1:
-            data = sparse.zeros(tuple(self.clustering.n_categories))
-            for k in range(self.n_clusters):
-                data += self.clustering.clusters[k]
+            indices = list(range(self.dataset.shape[0]))
         else:
-            data = self.clustering.clusters[cluster]
+            indices = np.where(np.array(self.cluster_assignments) == cluster)[0]
+
+        data = np.zeros(tuple(self.clustering.n_categories))
+        for idx in indices:
+            multi_index = self._get_multi_dimensional_index(self.dataset.loc[idx])
+            data[multi_index] += 1
+
         column_values = []
         for col in range(self.dataset.shape[1]):
             column_values += [list(self.category_values[self.dataset.columns[col]])]
+
         if self.dataset.shape[1] == 1:
-            df = pd.DataFrame(data=data.todense(), index=column_values[0])
+            df = pd.DataFrame(data=data, index=column_values[0])
         elif self.dataset.shape[1] == 2:
-            df = pd.DataFrame(data=data.todense(), index=column_values[0], columns=column_values[1])
+            df = pd.DataFrame(data=data, index=column_values[0], columns=column_values[1])
         else:
             raise AttributeError('Can not have a dataframe for more than two attributes!')
         return df

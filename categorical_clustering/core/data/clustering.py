@@ -1,4 +1,3 @@
-import sparse
 import numpy as np
 from scipy.stats import entropy
 
@@ -14,20 +13,21 @@ class Clustering:
         self.size = size
         self.n_clusters = n_clusters
         self.n_categories = n_categories
-        self.clusters = [sparse.zeros(tuple(self.n_categories)) for i in range(self.n_clusters)]
+        self.clusters = [np.zeros((len(n_categories), max(n_categories))).astype('float') for i in range(self.n_clusters)]
+        self.cluster_sizes = [0] * size
 
     def reset_clusters(self):
         """
         Resets all clusters to empty ones.
         """
-        self.clusters = [sparse.zeros(tuple(self.n_categories)) for i in range(self.n_clusters)]
+        self.clusters = [np.zeros(self.clusters[0].shape).astype('float') for i in range(self.n_clusters)]
 
     def get_writable_clusters(self):
         """
         Todo
         :return:
         """
-        return list(map(lambda cluster: cluster.asformat('dok'), self.clusters))
+        return self.clusters
 
     def update_clusters_from_writable(self, clusters):
         """
@@ -35,7 +35,7 @@ class Clustering:
         :param clusters:
         :return:
         """
-        self.clusters = [cluster.asformat('coo') for cluster in clusters]
+        self.clusters = clusters
 
     def get_cluster_size(self, cluster: int) -> int:
         """
@@ -43,9 +43,7 @@ class Clustering:
         :param cluster: An int, the cluster to calculate size on.
         :return: A int, the size of the cluster.
         """
-        dimensions = list(range(len(self.n_categories)))
-        size = int(np.sum(self.clusters[cluster], dimensions))
-        return size
+        return self.cluster_sizes[cluster]
 
     def calculate_cluster_impurity(self, cluster: int) -> float:
         """
@@ -55,15 +53,10 @@ class Clustering:
         """
         if self.size == 0:
             return 0.0
-        dimensions = list(range(len(self.n_categories)))
-        size = int(np.sum(self.clusters[cluster], dimensions))
-        if size == 0:
-            return 0.0
-        ent = 0.0
-        for d in dimensions:
-            other_dimensions = dimensions[:d] + dimensions[d+1:]
-            ent += entropy(np.sum(self.clusters[cluster], other_dimensions).todense().squeeze())
-        return ent * (size / self.size)
+        new_data = self.clusters[cluster].reshape(-1,)
+        new_data = new_data[new_data.nonzero()[0]] / self.cluster_sizes[cluster]
+        ent = -np.sum(new_data * np.log(new_data))
+        return ent * (self.cluster_sizes[cluster] / self.size)
 
     def calculate_overall_impurity(self) -> float:
         """
@@ -77,5 +70,14 @@ class Clustering:
 
     # This is going to be a rough task :D
     def clusters_to_string(self):
-        from sparse import DOK
         raise NotImplementedError('Not implemented yet')
+
+    def assign_row_to_cluster(self, row_multi_index, cluster):
+        self.cluster_sizes[cluster] += 1
+        for dimension, index in enumerate(row_multi_index):
+            self.clusters[cluster][dimension, index] += 1
+
+    def remove_row_from_cluster(self, row_multi_index, cluster):
+        self.cluster_sizes[cluster] -= 1
+        for dimension, index in enumerate(row_multi_index):
+            self.clusters[cluster][dimension, index] -= 1
