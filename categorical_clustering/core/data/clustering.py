@@ -14,13 +14,14 @@ class Clustering:
         self.n_clusters = n_clusters
         self.n_categories = n_categories
         self.clusters = [np.zeros((len(n_categories), max(n_categories))).astype('float') for i in range(self.n_clusters)]
-        self.cluster_sizes = [0] * size
+        self.cluster_sizes = [0] * n_clusters
 
     def reset_clusters(self):
         """
         Resets all clusters to empty ones.
         """
         self.clusters = [np.zeros(self.clusters[0].shape).astype('float') for i in range(self.n_clusters)]
+        self.cluster_sizes = [0] * self.n_clusters
 
     def get_writable_clusters(self):
         """

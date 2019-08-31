@@ -18,6 +18,9 @@ class BaseIterativeClustering:
         self.clustering = None
         self.category_values = None
         self.cluster_assignments = None
+        self.combination_decisions = {}
+        self.category_counts = []
+        self.currently_rejected_victim_clusters = {}
         self.step_init = 0
         self.step_index = 0
         self.step_calc = 0
@@ -43,6 +46,18 @@ class BaseIterativeClustering:
 
         self.cluster_assignments = [-1] * dataset.shape[0]
 
+        self.combination_decisions = {}
+        for row in self.dataset.values:
+            multi_index = self._get_multi_dimensional_index(row)
+            self.combination_decisions[multi_index] = -1
+
+        self.category_counts = []
+        for dim in dataset.columns:
+            self.category_counts.append(dataset[dim].value_counts()[dataset[dim].unique()].values)
+
+    def _reset_combination_decisions(self):
+        self.combination_decisions = self.combination_decisions.fromkeys(self.combination_decisions, -1)
+
     def _get_multi_dimensional_index(self, point) -> tuple:
         """
         Returns the index of the input point in the multi-dimensional array holding the cmf values in Clustering object.
@@ -50,8 +65,8 @@ class BaseIterativeClustering:
         :return: A list, the index of the input data point, as a list of indexes for each dimension.
         """
         multi_index = []
-        for col in self.dataset.columns:
-            multi_index += [self.category_values[col][point[col]]]
+        for idx, col in enumerate(self.dataset.columns):
+            multi_index += [self.category_values[col][point[idx]]]
         return tuple(multi_index)
 
     def _initialize_clusters(self):
@@ -89,9 +104,11 @@ class BaseIterativeClustering:
         pass
 
     @abstractmethod
-    def _random_swap(self):
+    def _random_swap(self, victim_cluster=-1, prototype_index=-1):
         """
         Performs a random swap, removing one of the clusters and then creating a new one.
+        :param victim_cluster: An int, the victim cluster, if set to -1, the victim cluster will be chosen randomly
+        :param prototype_index: An int, the data point to be moved, if set to -1, the prototype index will be chosen randomly
         """
         pass
 
@@ -118,14 +135,26 @@ class BaseIterativeClustering:
         if initialize_clusters:
             self._initialize_clusters()
         iterations = 0
+        last_impurity = -1
+        second_last_impurity = -1
         while True:
             iterations += 1
+            if iterations >= 20:
+                print('Stuck in loop!')
+                return self.clustering, iterations
             moved_points_count = self._perform_iteration()
             if self.should_abort:
                 return None, -1
+            new_impurity = self.clustering.calculate_overall_impurity()
+            if new_impurity == second_last_impurity:
+                print('Stuck in loop!')
+                return self.clustering, iterations
+            else:
+                second_last_impurity = last_impurity
+                last_impurity = new_impurity
             if verbose:
                 print('Moved points in iteration {}: {}'.format(iterations, moved_points_count))
-                print('Overall impurity is now: {}'.format(self.clustering.calculate_overall_impurity()))
+                print('Overall impurity is now: {}'.format(new_impurity))
             if moved_points_count / self.dataset.shape[0] <= update_proportion_criterion:
                 print('Reached criterion, stoping.')
                 break
@@ -149,7 +178,7 @@ class BaseIterativeClustering:
 
             # Getting a backup from the current state
             prev_clustering = deepcopy(self.clustering)
-            prev_cluster_assignemnts = deepcopy(self.cluster_assignments)
+            prev_cluster_assignments = deepcopy(self.cluster_assignments)
             prev_overall_impurity = self.clustering.calculate_overall_impurity()
 
             # Performing a random swap
@@ -158,7 +187,7 @@ class BaseIterativeClustering:
             if self.should_abort:
                 print('Aborting random swap...')
                 self.clustering = prev_clustering
-                self.cluster_assignments = prev_cluster_assignemnts
+                self.cluster_assignments = prev_cluster_assignments
                 self.should_abort = False
                 random_swaps += 1
                 continue
@@ -169,7 +198,7 @@ class BaseIterativeClustering:
                 if verbose:
                     print('Random swap rejected!')
                 self.clustering = prev_clustering
-                self.cluster_assignments = prev_cluster_assignemnts
+                self.cluster_assignments = prev_cluster_assignments
             else:
                 if verbose:
                     print('Random swap accepted!')
