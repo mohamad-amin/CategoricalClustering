@@ -56,6 +56,26 @@ Cluster number of each input datapoint can be accessed using `model.cluster_assi
 
 **Note:** The code is still under development and has not been intesively tested, so there is no guarentee of using it in production. But so far, no problem has been reported, so there also should be no specific problem.
 
+## Empirical evaluations
+
+Results of running `SASD` on Mushrooms dataset without random swap (100 times)
+
+|          Statistic         	| Value 	|
+|:--------------------------:	|:-----:	|
+|      Average impurity      	|  7.13 	|
+|   Best (lowest) impurity   	|  6.98 	|
+|  Worst (highest) impurity  	|  7.90 	|
+| Standard error of impurity 	|  0.13 	|
+
+Results of running `SASD` on Mushrooms dataset with random swap (100 times)
+
+|          Statistic         	| Value 	|
+|:--------------------------:	|:-----:	|
+|      Average impurity      	|  6.99 	|
+|   Best (lowest) impurity   	|  6.95 	|
+|  Worst (highest) impurity  	|  7.07 	|
+| Standard error of impurity 	|  0.02 	|
+
 ## Credits:
 * Mohamad Amin Mohamadi (mohammadi.mohamadamin@gmail.com)
 * Prof. Pasi Franti (franti sign_at cs dot uef dot fi)
