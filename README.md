@@ -7,6 +7,14 @@ for test purposes and comparison of different algorithms.
 The code is implemented using `Numpy`, `Scipy` and `Pandas`. I have also used `Numba` for parallelism and optimized machine code. 
 According to the experiments, the code takes about ~0.5 second to run each iteration of KM-Epsilon on [Mushrooms](https://archive.ics.uci.edu/ml/datasets/Mushroom) dataset.
 
+## Table of Contents
+1. [Usage](#usage)
+2. [Visualization](#visualization)
+3. [Empirical evaluations](#empirical-evaluations)
+4. [Documents](#documents)
+5. [Credits](#credits)
+
+
 ## Usage
 Available strategies for convergence are:
 * Separate attribute probability distance (`SeparateAttributePMF`)
