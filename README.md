@@ -17,6 +17,7 @@ Available strategies for convergence are:
 * Separate attribute probability distance (`SeparateAttributePMF`)
 * Separate attribute category distance (`SeparateAttributeCategoryPMF`)
 * Separate attribute squared distance (`SeparateAttributeSquaredDistance`)
+
 Parameters used are described down below in the corresponding table.
 
 ### Sample code for using separate attribute squared distance strategy without random swap:
