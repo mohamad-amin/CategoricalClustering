@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 
-tsne_result = pkl.load(open('categorical_clustering/data/mushroom_tsne.pkl', 'rb'))
+tsne_result = pkl.load(open('categorical_clustering/data/mushroom_tsne_reduction.pkl', 'rb'))
 tsne_df = pd.DataFrame(tsne_result, columns=['One', 'Two'])
 df = pd.read_csv('categorical_clustering/data/mushrooms.data', header=None)
 sub_clustering, sub_assignment = pkl.load(open('/Users/hezardastan/results_5000.pkl', 'rb'))

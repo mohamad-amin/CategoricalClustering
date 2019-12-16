@@ -13,6 +13,7 @@ class BaseIterativeClustering:
         Initiates an iterative clustering algorithm.
         :param n_clusters: Number of clusters to achieve.
         """
+        self.n_points = -1
         self.n_clusters = n_clusters
         self.dataset = None
         self.clustering = None
@@ -21,11 +22,14 @@ class BaseIterativeClustering:
         self.combination_decisions = {}
         self.category_counts = []
         self.currently_rejected_victim_clusters = {}
+        self.multi_indexes = []
         self.step_init = 0
         self.step_index = 0
         self.step_calc = 0
         self.step_calc_1 = 0
         self.step_calc_2 = 0
+        self.step_calc_3 = 0
+        self.step_calc_4 = 0
         self.step_assign = 0
         self.overall_time = 0
         self.should_abort = False
@@ -36,6 +40,7 @@ class BaseIterativeClustering:
         :param dataset: The input dataset for clustering algorithm.
         """
         self.dataset = dataset
+        self.n_points = dataset.shape[0]
 
         n_categories = [dataset[col].nunique() for col in dataset.columns]
         self.clustering = Clustering(self.n_clusters, n_categories, dataset.shape[0])
@@ -49,6 +54,7 @@ class BaseIterativeClustering:
         self.combination_decisions = {}
         for row in self.dataset.values:
             multi_index = self._get_multi_dimensional_index(row)
+            self.multi_indexes += [np.array(multi_index)]
             self.combination_decisions[multi_index] = -1
 
         self.category_counts = []
@@ -75,10 +81,9 @@ class BaseIterativeClustering:
         """
         self.clustering.reset_clusters()
         writable_clusters = self.clustering.get_writable_clusters()
-        for idx, row in zip(self.dataset.index, self.dataset.values):
+        for idx in self.dataset.index:
             cluster = np.random.choice(self.n_clusters)
-            multi_index = self._get_multi_dimensional_index(row)
-            self.clustering.assign_row_to_cluster(multi_index, cluster)
+            self.clustering.assign_row_to_cluster(self.multi_indexes[idx], cluster)
             self.cluster_assignments[idx] = cluster
         self.clustering.update_clusters_from_writable(writable_clusters)
         for k in range(self.n_clusters):
@@ -171,8 +176,12 @@ class BaseIterativeClustering:
             number of iterations until convergence according to the criterion (iterations of the original algorithm,
             not random swap).
         """
-        _, iterations = self.perform_clustering(update_proportion_criterion=update_proportion_criterion, verbose=verbose)
+        _, iterations = self.perform_clustering(update_proportion_criterion=update_proportion_criterion, verbose=False)
         random_swaps = 0
+
+        accepted_iterations = []
+        labels = []
+        accepted_iterations += (random_swaps, self.clustering.calculate_overall_impurity())
 
         while random_swaps < t:
 
@@ -183,7 +192,7 @@ class BaseIterativeClustering:
 
             # Performing a random swap
             self._random_swap()
-            _, iters = self.perform_clustering(update_proportion_criterion, False, verbose)
+            _, iters = self.perform_clustering(update_proportion_criterion, False, False)
             if self.should_abort:
                 print('Aborting random swap...')
                 self.clustering = prev_clustering
@@ -200,11 +209,14 @@ class BaseIterativeClustering:
                 self.clustering = prev_clustering
                 self.cluster_assignments = prev_cluster_assignments
             else:
+                accepted_iterations += (random_swaps, self.clustering.calculate_overall_impurity())
+                if self.clustering.calculate_overall_impurity() < 7.017:
+                    labels.append(self.cluster_assignments)
                 if verbose:
                     print('Random swap accepted!')
             random_swaps += 1
 
-        return self.clustering, iterations
+        return self.clustering, iterations, np.array(accepted_iterations), labels
 
     def get_cluster_as_dataframe(self, cluster=-1):
         """
@@ -212,7 +224,6 @@ class BaseIterativeClustering:
         :param cluster:
         :return:
         """
-
         if cluster == -1:
             indices = list(range(self.dataset.shape[0]))
         else:
@@ -220,7 +231,7 @@ class BaseIterativeClustering:
 
         data = np.zeros(tuple(self.clustering.n_categories))
         for idx in indices:
-            multi_index = self._get_multi_dimensional_index(self.dataset.loc[idx])
+            multi_index = self.multi_indexes[idx]
             data[multi_index] += 1
 
         column_values = []

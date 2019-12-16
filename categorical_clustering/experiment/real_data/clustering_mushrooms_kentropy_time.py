@@ -4,15 +4,15 @@ from categorical_clustering.core.algorithm.k_entropy import KEntropy
 
 import sys
 old_stdout = sys.stdout
-log_file = open("message_votes_kentropy.log", "w")
-sys.stdout = log_file
+# log_file = open("mushrooms_kentropy_100.log", "w")
+# sys.stdout = log_file
 
 
-df = pd.read_csv('categorical_clustering/data/votes.data', header=None)
-model = KEntropy(n_clusters=2)
+df = pd.read_csv('../../data/soybean-small.data', header=None).iloc[:, :-1]
+model = KEntropy(n_clusters=4)
 model.set_data(df)
 results = []
-for i in range(1000):
+for i in range(100):
     print('Iteration {}'.format(i))
     clustering, iters = model.perform_clustering(verbose=True)
     print('Converged in {} iterations!'.format(iters))
@@ -34,5 +34,5 @@ print('Min: {}'.format(results[:, 0].min()))
 print('Max: {}'.format(results[:, 0].max()))
 print('Std: {}'.format(results[:, 0].std()))
 
-sys.stdout = old_stdout
-log_file.close()
+# sys.stdout = old_stdout
+# log_file.close()

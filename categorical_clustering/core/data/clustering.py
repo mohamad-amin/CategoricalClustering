@@ -1,5 +1,7 @@
 import numpy as np
-from scipy.stats import entropy
+from numba import njit, jit
+from sklearn.preprocessing import LabelEncoder
+from categorical_clustering.utils.distance_utils import squared_euclidean_distance, hamming_distance
 
 
 class Clustering:
@@ -10,6 +12,7 @@ class Clustering:
         :param n_clusters: the number of clusters
         :param n_categories: a list of the count of unique categories for each cluster
         """
+        self.step_ent = 0
         self.size = size
         self.n_clusters = n_clusters
         self.n_categories = n_categories
@@ -73,12 +76,38 @@ class Clustering:
     def clusters_to_string(self):
         raise NotImplementedError('Not implemented yet')
 
+    @staticmethod
+    @njit
+    def _fast_change(cluster, row_multi_index, how):
+        for dimension, index in enumerate(row_multi_index):
+            cluster[dimension, index] += how
+
     def assign_row_to_cluster(self, row_multi_index, cluster):
         self.cluster_sizes[cluster] += 1
-        for dimension, index in enumerate(row_multi_index):
-            self.clusters[cluster][dimension, index] += 1
+        self._fast_change(self.clusters[cluster], row_multi_index, +1)
 
     def remove_row_from_cluster(self, row_multi_index, cluster):
         self.cluster_sizes[cluster] -= 1
-        for dimension, index in enumerate(row_multi_index):
-            self.clusters[cluster][dimension, index] -= 1
+        self._fast_change(self.clusters[cluster], row_multi_index, -1)
+
+    @staticmethod
+    @jit(parallel=True)
+    def calculate_overlap(dataset, cluster_assignments, centroids, multi_indexes):
+
+        for k in range(len(centroids)):
+            centroids[k] = centroids[k].ravel()
+
+        dataset = dataset.apply(LabelEncoder().fit_transform).values
+
+        cluster_assignments = np.array(cluster_assignments)
+        overlaps = 0
+        for index in range(len(dataset)):
+            current_cluster = cluster_assignments[index]
+            distance_to_centroid = squared_euclidean_distance(centroids[current_cluster], multi_indexes[index])
+            item = dataset[index, :]
+            for other_index in np.where(cluster_assignments != current_cluster)[0]:
+                if hamming_distance(item, dataset[other_index, :]) < distance_to_centroid:
+                    overlaps += 1
+                    break
+
+        return overlaps / len(dataset)
