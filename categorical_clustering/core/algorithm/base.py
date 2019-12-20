@@ -23,6 +23,8 @@ class BaseIterativeClustering:
         self.category_counts = []
         self.currently_rejected_victim_clusters = {}
         self.multi_indexes = []
+        self.multi_index_size = -1
+        self.r_multi_indexes = None
         self.step_init = 0
         self.step_index = 0
         self.step_calc = 0
@@ -56,6 +58,9 @@ class BaseIterativeClustering:
             multi_index = self._get_multi_dimensional_index(row)
             self.multi_indexes += [np.array(multi_index)]
             self.combination_decisions[multi_index] = -1
+
+        self.multi_index_size = len(self.multi_indexes[0])
+        self.r_multi_indexes = np.array(self.multi_indexes).ravel()
 
         self.category_counts = []
         for dim in dataset.columns:

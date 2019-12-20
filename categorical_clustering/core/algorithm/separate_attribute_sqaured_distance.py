@@ -1,18 +1,41 @@
 import numpy as np
-from numba import jit, njit
+import numba as nb
 from copy import deepcopy
 
 from ...utils.logger import log, LEVEL
 from .base import BaseIterativeClustering
 
 
+@nb.njit(parallel=True)
+def calculate_point_destinations(n_points, n_clusters, multi_indexes, multi_index_size, dims_array, centroids, centroid_size):
+    dests = np.zeros(n_points, dtype=np.int32)
+    for index in nb.prange(n_points):
+
+        multi_index = multi_indexes[index * multi_index_size:(index + 1) * multi_index_size]
+        indices = dims_array + multi_index
+
+        least_distance = 1e7
+        selected_cluster = -1
+        for k in range(n_clusters):
+            result = 0.0
+            centroid = centroids[k * centroid_size:(k + 1) * centroid_size]
+            for i in range(len(indices)):
+                result += (1 - centroid[indices[i]]) ** 2
+            if result < least_distance:
+                least_distance = result
+                selected_cluster = k
+
+        dests[index] = selected_cluster
+
+    return dests
+
+
 class SeparateAttributeSquaredDistance(BaseIterativeClustering):
 
     def _random_swap(self, victim_cluster=-1, prototype_index=-1):
 
-        print('Impurity before random swap: {}'.format(self.clustering.calculate_overall_impurity()))
+        # print('Impurity before random swap: {}'.format(self.clustering.calculate_overall_impurity()))
         # log('Performing random swap...', level=LEVEL.VERBOSE)
-
         # Choosing the new prototype
         if prototype_index == -1:
             prototype_cluster = np.random.choice(self.n_clusters)
@@ -49,7 +72,6 @@ class SeparateAttributeSquaredDistance(BaseIterativeClustering):
         self.cluster_assignments = list(map(lambda x: -1 if x == victim_cluster else x, self.cluster_assignments))
         self.cluster_assignments[prototype_index] = victim_cluster
 
-    @jit
     def _calculate_centroids(self) -> list:
 
         cluster_matrices = []
@@ -68,15 +90,6 @@ class SeparateAttributeSquaredDistance(BaseIterativeClustering):
 
         return cluster_matrices
 
-    @staticmethod
-    @njit
-    def _indexed_get_sum(centroid, indices):
-        result = 0
-        for i in range(len(indices)):
-            result += (1 - centroid[indices[i]]) ** 2
-        return result
-
-    @jit(parallel=True)
     def _assign_data_to_clusters(self, centroids: list) -> int:
 
         dims_array = np.arange(self.dataset.shape[1]) * centroids[0].shape[1]
@@ -84,20 +97,18 @@ class SeparateAttributeSquaredDistance(BaseIterativeClustering):
         for k in range(self.n_clusters):
             centroids[k] = centroids[k].ravel()
 
+        centroid_size = len(centroids[0])
+        centroids = np.array(centroids).ravel()
+
+        dests = calculate_point_destinations(
+            self.n_points, self.n_clusters, self.r_multi_indexes, self.multi_index_size, dims_array, centroids, centroid_size)
+
         movements = 0
         for index in range(self.n_points):
 
             prev_cluster = self.cluster_assignments[index]
             multi_index = self.multi_indexes[index]
-            indices = dims_array + multi_index
-
-            least_distance = 1e10
-            selected_cluster = -1
-            for k in range(self.n_clusters):
-                result = self._indexed_get_sum(centroids[k], indices)
-                if result < least_distance:
-                    least_distance = result
-                    selected_cluster = k
+            selected_cluster = dests[index]
 
             if prev_cluster != selected_cluster:
                 if prev_cluster != -1:
